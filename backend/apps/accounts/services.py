@@ -1,4 +1,6 @@
-from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
+
+from apps.core.models import Branch
 
 from .models import AccountConfiguration, BranchMembership
 
@@ -20,10 +22,8 @@ def user_has_branch_permission(user, branch, permission_codename, app_label=None
     configuration = (
         AccountConfiguration.objects
         .filter(cafe_id=branch.cafe_id)
-        .select_related("owner")
         .first()
     )
-
     if configuration is None:
         return False
 
@@ -53,23 +53,28 @@ def user_has_branch_permission(user, branch, permission_codename, app_label=None
 
 
 def get_user_active_branches(user):
-    """فهرست شعب فعال قابل دسترس برای کاربر."""
+    """برگرداندن QuerySet شعب فعال قابل دسترس برای کاربر."""
     if not user or not user.is_authenticated:
-        return BranchMembership.objects.none()
+        return Branch.objects.none()
 
     if user.is_superuser:
-        from apps.core.models import Branch
         return Branch.objects.filter(is_active=True)
 
-    memberships = (
-        BranchMembership.objects
-        .filter(
-            user=user,
-            is_active=True,
-            branch__is_active=True,
-            role__is_active=True,
-        )
-        .select_related("branch", "role", "branch__cafe")
-        .order_by("branch__code")
+    owned_cafe_ids = AccountConfiguration.objects.filter(
+        owner_id=user.pk
+    ).values_list("cafe_id", flat=True)
+
+    member_branch_ids = BranchMembership.objects.filter(
+        user=user,
+        is_active=True,
+        role__is_active=True,
+        branch__is_active=True,
+    ).values_list("branch_id", flat=True)
+
+    return (
+        Branch.objects
+        .filter(is_active=True)
+        .filter(Q(cafe_id__in=owned_cafe_ids) | Q(pk__in=member_branch_ids))
+        .distinct()
+        .order_by("code")
     )
-    return memberships
