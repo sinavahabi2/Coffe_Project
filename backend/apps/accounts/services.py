@@ -19,11 +19,9 @@ def user_has_branch_permission(user, branch, permission_codename, app_label=None
     if user.is_superuser:
         return True
 
-    configuration = (
-        AccountConfiguration.objects
-        .filter(cafe_id=branch.cafe_id)
-        .first()
-    )
+    configuration = AccountConfiguration.objects.filter(
+        cafe_id=branch.cafe_id
+    ).first()
     if configuration is None:
         return False
 
@@ -53,12 +51,12 @@ def user_has_branch_permission(user, branch, permission_codename, app_label=None
 
 
 def get_user_active_branches(user):
-    """برگرداندن QuerySet شعب فعال قابل دسترس برای کاربر."""
+    """برگرداندن QuerySet شعب فعالی که کاربر به آن‌ها دسترسی دارد."""
     if not user or not user.is_authenticated:
         return Branch.objects.none()
 
     if user.is_superuser:
-        return Branch.objects.filter(is_active=True)
+        return Branch.objects.filter(is_active=True).order_by("code")
 
     owned_cafe_ids = AccountConfiguration.objects.filter(
         owner_id=user.pk
@@ -69,6 +67,9 @@ def get_user_active_branches(user):
         is_active=True,
         role__is_active=True,
         branch__is_active=True,
+        branch__cafe__account_configuration__operating_mode=(
+            AccountConfiguration.OperatingMode.MULTI
+        ),
     ).values_list("branch_id", flat=True)
 
     return (
