@@ -1,7 +1,7 @@
 
 from django.db.models.signals import pre_save, post_save, post_delete
+from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.dispatch import receiver
-
 from .models import AuditLog
 from .middleware import get_current_user, get_current_ip
 
@@ -110,4 +110,33 @@ def log_delete(sender, instance, **kwargs):
         object_id=str(instance.pk),
         object_repr=str(instance)[:255],
         description="رکورد حذف شد.",
+    )
+
+@receiver(user_logged_in)
+def log_user_login(sender, request, user, **kwargs):
+
+    AuditLog.objects.create(
+        user=user,
+        ip_address=get_current_ip(),
+        action=AuditLog.ActionType.LOGIN,
+        model_name="auth.User",
+        object_id=str(user.pk),
+        object_repr=str(user),
+        description="کاربر وارد سیستم شد."
+    )
+
+@receiver(user_logged_out)
+def log_user_logout(sender, request, user, **kwargs):
+
+    if user is None:
+        return
+
+    AuditLog.objects.create(
+        user=user,
+        ip_address=get_current_ip(),
+        action=AuditLog.ActionType.LOGOUT,
+        model_name="auth.User",
+        object_id=str(user.pk),
+        object_repr=str(user),
+        description="کاربر از سیستم خارج شد."
     )
