@@ -48,6 +48,7 @@
 python manage.py check
 python manage.py makemigrations accounts
 python manage.py migrate
+python manage.py test apps.accounts
 python manage.py createsuperuser
 python manage.py runserver
 ```
